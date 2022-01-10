@@ -1,31 +1,30 @@
 from flask import Flask, request, jsonify
-import sys
-# from collections import Counter, OrderedDict
-import itertools
-import islice, count, groupby
+# import sys
+from collections import Counter, OrderedDict
+# import itertools
+# import islice, count, groupby
 import pandas as pd
-import os
+# import os
 import re
-import builtins
-from numpy import dot
-from numpy.linalg import norm
-from operator import itemgetter
+import numpy as np
+# import builtins
+# from numpy import dot
+# from numpy.linalg import norm
+# from operator import itemgetter
 import nltk
 from nltk.stem.porter import *
 from nltk.corpus import stopwords
-from time import time
-from timeit import timeit
+# from time import time
+# from timeit import timeit
 from pathlib import Path
-import numpy as np
-import requests
-from bs4 import BeautifulSoup
+# from bs4 import BeautifulSoup
 from google.cloud import storage
 import math
-import hashlib
+# import hashlib
 from contextlib import closing
 from inverted_index_gcp import MultiFileReader
-def _hash(s):
-    return hashlib.blake2b(bytes(s, encoding='utf8'), digest_size=5).hexdigest()
+# def _hash(s):
+#     return hashlib.blake2b(bytes(s, encoding='utf8'), digest_size=5).hexdigest()
 
 nltk.download('stopwords')
 
@@ -41,7 +40,6 @@ TF_MASK = 2 ** 16 - 1 # Masking the 16 low bits of an integer
 # from inverted_index_colab import *
 import inverted_index_gcp
 import pickle
-from pathlib import Path
 
 
 
@@ -68,7 +66,7 @@ titlesDocs=None
 with open(driveC+"titles.pkl", 'rb') as f:
     titlesDocs=pickle.load(f)
 
-pagerank = pd.read_csv('/content/drive/MyDrive/project/pr/pr_part-00000-e292183f-3bf4-4e21-9745-5b824a3714d0-c000.csv.gz', compression='gzip', header=0, sep=' ', quotechar='"', error_bad_lines=False)
+pagerank = pd.read_csv(driveC+'part-00000-e292183f-3bf4-4e21-9745-5b824a3714d0-c000.csv.gz', compression='gzip', header=0, sep=' ', quotechar='"', error_bad_lines=False)
 pagerank.columns=["id"]
 new = pagerank["id"].str.split(",", n = 1, expand = True)
 pagerank["id"]= new[0]
@@ -97,19 +95,25 @@ def read_posting_list(path,inverted, w):
 
 def generate_tfidf (query_to_search, index,N=3):
     epsilon = .0000001
-    query=[q for q in query_to_search if q in index.df.keys()]
-    sim={}
+    query = [q for q in query_to_search if q in index.df.keys()]
+    counter = Counter(query)
+    summ = 0
+    for i in (counter).values():
+        summ += i * i
+    q = 1/math.sqrt(summ)
+    sim = {}
     for term in np.unique(query):
         if term in index.df.keys():
             list_of_doc = read_posting_list(driveText, index, term)
-            tf = counter[term] / len(query)  # term frequency divded by the length of the query
+            tf = counter[term] / len(query)
             df = index.df[term]
             idf = math.log((len(nf)) / (df + epsilon), 10)
-            tfidfQ=tf * idf          
+            tfidfQ = tf * idf
             for doc_id, freq in list_of_doc:
-                tfidfD=(freq / nf[doc_id]) * math.log(len(nf) / index.df[term], 10)
-                sim[doc_id]=sim.get(doc_id,0)+tfidfD*tfidfQ
+                tfidfD = (freq / nf[doc_id]) * math.log(len(nf) / index.df[term], 10)
+                sim[doc_id] = sim.get(doc_id, 0) + tfidfD * tfidfQ
     return sorted([(doc_id, score) for doc_id, score in sim.items()], key=lambda x: x[1], reverse=True)[:N]
+
 
 def title_from_id(lst):
     titles=[]
@@ -143,6 +147,7 @@ def search():
       return jsonify(res)
     # BEGIN SOLUTION
     tokens = [token.group() for token in RE_WORD.finditer(query.lower())]
+    tokens=[token for token in tokens if token in index_text.df and index_text.df[token]<300000]
     lst_doc = generate_tfidf(tokens, index_text,100)
     res=title_from_id(lst_doc)
     # END SOLUTION
@@ -266,7 +271,7 @@ def get_pagerank():
       return jsonify(res)
     # BEGIN SOLUTION
     for id_doc in wiki_ids:
-        res.append(dict_scores[id_doc])
+        res.append(dict_scores.get(id_doc,0))
     # END SOLUTION
     return jsonify(res)
 
@@ -294,11 +299,11 @@ def get_pageview():
       return jsonify(res)
     # BEGIN SOLUTION
     for id_doc in wiki_ids:
-        res.append(wid2pv[id_doc])
+        res.append(wid2pv.get(id_doc,0))
     # END SOLUTION
     return jsonify(res)
 
 
 if __name__ == '__main__':
     # run the Flask RESTful API, make the server publicly available (host='0.0.0.0') on port 8080
-    app.run(host='0.0.0.0', port=8080, debug=True)
+    app.run(host='0.0.0.0', port=8080)
